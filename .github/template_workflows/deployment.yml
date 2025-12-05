@@ -1,0 +1,65 @@
+name: Deploy virtual machines
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    runs-on: [self-hosted, terraform]
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+      # vSphere / vRA / VCF environment-specific credentials
+      TF_VAR_vcfa_refresh_token: ${{ secrets.VCFA_REFRESH_TOKEN}}
+      TF_VAR_vcfa_project: ${{ secrets.VCFA_PROJECT}}
+      TF_VAR_vcfa_organization: ${{ secrets.vcfa_organization}}
+      TF_VAR_vcfa_url: ${{ secrets.vcfa_url}}
+      
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        run: |
+             terraform init -migrate-state -input=false -upgrade \
+             -backend-config="conn_str=postgres://${{ secrets.PSQL_TF_USER }}:${{ secrets.PSQL_TF_PASS }}@${{ secrets.PSQL_TF_HOST }}:5433/${{ secrets.PSQL_TF_DB }}?sslmode=disable"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+              terraform plan -input=false -no-color \
+              -var-file="envs/lab.tfvars" \
+              -out=tfplan
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: tfplan
+
+      - name: Terraform Apply
+        #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: terraform apply -input=false -auto-approve tfplan
+        
+      - name: Upload output Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-list.txt
+          path: server-list.txt
+
+      - name: Clean workspace
+        run: rm -rf $GITHUB_WORKSPACE/.[!.]*
+
