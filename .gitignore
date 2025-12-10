@@ -5,6 +5,7 @@
 *.tfstate
 *.tfstate.*
 *conf*
+*lock.hcl
 server-list.txt
 
 

@@ -10,18 +10,23 @@ on:
 
 jobs:
   terraform:
+    if: github.repository != 'sentania-labs/vcf-lab-application-template'
     runs-on: [self-hosted, terraform]
 
     env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      VCFA_PROJECT_NAME: ${{ secrets.VCFA_PROJECT_NAME }}
+      VCFA_PROJECT_ID:   ${{ secrets.VCFA_PROJECT_ID }}
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
 
       # vSphere / vRA / VCF environment-specific credentials
       TF_VAR_vcfa_refresh_token: ${{ secrets.VCFA_REFRESH_TOKEN}}
-      TF_VAR_vcfa_project: ${{ secrets.VCFA_PROJECT}}
-      TF_VAR_vcfa_organization: ${{ secrets.vcfa_organization}}
-      TF_VAR_vcfa_url: ${{ secrets.vcfa_url}}
-      
+      TF_VAR_project_name: ${{ secrets.VCFA_PROJECT_NAME}}
+      TF_VAR_vcfa_organization: ${{ secrets.VCFA_ORGANIZATION_NAME}}
+      TF_VAR_vcfa_url: ${{ vars.VCFA_URL}}
 
     steps:
       - name: Checkout repository
@@ -30,10 +35,24 @@ jobs:
       - name: Terraform Format Check
         run: terraform fmt -check
 
+      - name: Compute Terraform state key
+        id: tfstate
+        shell: bash
+        run: |
+          PROJECT_SLUG=$(echo "$VCFA_PROJECT_NAME" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's/[^a-z0-9]+/-/g; s/^-//; s/-$//')
+
+          PROJECT_ID_SHORT=$(echo "$VCFA_PROJECT_ID" | cut -d- -f1)
+
+          TF_STATE_KEY="vra/${PROJECT_SLUG}__${PROJECT_ID_SHORT}/terraform.tfstate"
+
+          echo "TF_STATE_KEY=$TF_STATE_KEY" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         run: |
              terraform init -migrate-state -input=false -upgrade \
-             -backend-config="conn_str=postgres://${{ secrets.PSQL_TF_USER }}:${{ secrets.PSQL_TF_PASS }}@${{ secrets.PSQL_TF_HOST }}:5433/${{ secrets.PSQL_TF_DB }}?sslmode=disable"
+             -backend-config="key=${TF_STATE_KEY}"
 
       - name: Terraform Validate
         run: terraform validate
@@ -51,7 +70,7 @@ jobs:
           path: tfplan
 
       - name: Terraform Apply
-        #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -input=false -auto-approve tfplan
         
       - name: Upload output Artifact

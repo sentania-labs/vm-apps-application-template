@@ -12,14 +12,13 @@ variable "vcfa_organization" {
   type = string
 }
 
-variable "vcfa_project" {
-  type = string
-}
-
-
 variable "insecure" {
   type    = bool
   default = true
+}
+variable "project_name" {
+  type        = string
+  description = "The name of the project to deploy to"
 }
 ########################################
 # Deployment Requests
@@ -36,7 +35,6 @@ variable "insecure" {
  *
  * deployments = {
  *   key = {
- *     project_name      = string
  *     catalog_item_name = string
  *     catalog_item_version = string
  *     deployment_name   = string
@@ -60,6 +58,11 @@ variable "insecure" {
  */
 variable "deployments" {
   description = "Map of vRA deployment request definitions."
+  type        = any
+}
+
+variable "virtual_machines" {
+  description = "Map of virtual machines to deploy."
   type        = any
 }
 
