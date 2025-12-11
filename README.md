@@ -33,6 +33,7 @@ This template enables you to:
 │   └── lab.tfvars
 ├── backend.tf
 ├── deployments.tf
+├── LICENSE
 ├── machines.tf
 ├── output-template.tpl
 ├── provider.tf
